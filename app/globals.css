@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-syne: 'Syne', sans-serif;
+    --font-dm:   'DM Sans', sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: #080C18;
+    color: #fff;
+    font-family: var(--font-dm);
+    overflow-x: hidden;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar       { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  textarea:focus { outline: none; }
+  button { font-family: inherit; }
+}
+
+@layer utilities {
+  .font-display { font-family: var(--font-syne); }
+  .font-body    { font-family: var(--font-dm);   }
+}
+
+/* ─── Keyframes not expressible in Tailwind config ─── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes bounce3 {
+  0%, 80%, 100% { transform: translateY(0);    opacity: 0.4; }
+  40%           { transform: translateY(-6px); opacity: 1;   }
+}
+
+@keyframes pulse2 {
+  0%, 100% { opacity: 1;  transform: scale(1);    }
+  50%      { opacity: .4; transform: scale(0.85); }
+}
+
+@keyframes strikethrough {
+  to { transform: scaleX(1); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.6; }
+}
+
+/* ─── Animation classes ─── */
+.animate-fadeUp       { animation: fadeUp  .45s ease both; }
+.animate-bounce3      { animation: bounce3 1.2s ease-in-out infinite; }
+.animate-bounce3-d1   { animation: bounce3 1.2s ease-in-out .2s infinite; }
+.animate-bounce3-d2   { animation: bounce3 1.2s ease-in-out .4s infinite; }
+.animate-pulse2       { animation: pulse2  2s   ease-in-out infinite; }
+.animate-spin-slow    { animation: spin    .8s  linear infinite; }
+.animate-glow-pulse   { animation: glow-pulse 3s ease-in-out infinite; }
+
+/* ─── Scroll reveal ─── */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity .65s ease, transform .65s ease;
+}
+.reveal.visible        { opacity: 1; transform: translateY(0); }
+.reveal-delay-1        { transition-delay: .1s; }
+.reveal-delay-2        { transition-delay: .2s; }
+.reveal-delay-delay-3  { transition-delay: .3s; }
+
+/* ─── Grid background ─── */
+.grid-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,194,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,194,255,0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+/* ─── Noise overlay ─── */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.028;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ─── Strike animation ─── */
+.strike-line {
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: strikethrough .5s 1.2s ease forwards;
+}
