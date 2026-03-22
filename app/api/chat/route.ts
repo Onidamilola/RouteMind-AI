@@ -26,24 +26,32 @@ Guidelines:
 function extractTrackingIds(text: string): string[] {
   // Matches RM-001 through RM-999 (case-insensitive)
   const matches = text.match(/RM-\d{3}/gi) ?? [];
-  return [...new Set(matches.map((m) => m.toUpperCase()))];
+  const seen: Record<string, true> = {};
+  const unique: string[] = [];
+  for (const match of matches) {
+    const id = match.toUpperCase();
+    if (seen[id]) continue;
+    seen[id] = true;
+    unique.push(id);
+  }
+  return unique;
 }
 
 // ─── Build shipment context block ────────────────────────────────────────────
 
 function buildShipmentContext(trackingIds: string[]): string {
-  const found = trackingIds
-    .map((id) => findShipment(id))
-    .filter(Boolean);
+  const found = trackingIds.map((id) => findShipment(id)).filter(Boolean);
 
   if (found.length === 0) return "";
 
   const lines = found.map((s) => {
     if (!s) return "";
     const statusLabel =
-      s.status === "in_transit" ? "In Transit 🚚"
-      : s.status === "delivered" ? "Delivered ✅"
-      : "Delayed ⚠️";
+      s.status === "in_transit"
+        ? "In Transit 🚚"
+        : s.status === "delivered"
+          ? "Delivered ✅"
+          : "Delayed ⚠️";
 
     return `
 SHIPMENT DATA FOR ${s.tracking_id}:
@@ -66,14 +74,15 @@ SHIPMENT DATA FOR ${s.tracking_id}:
 
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not set in environment variables.");
+  if (!apiKey)
+    throw new Error("OPENAI_API_KEY is not set in environment variables.");
   return new OpenAI({ apiKey });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ChatMessage {
-  role:    "user" | "assistant";
+  role: "user" | "assistant" | "ai";
   content: string;
 }
 
@@ -88,26 +97,33 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON in request body." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid JSON in request body." },
+      { status: 400 },
+    );
   }
 
   const { messages } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
-    return NextResponse.json({ error: "messages must be a non-empty array." }, { status: 400 });
+    return NextResponse.json(
+      { error: "messages must be a non-empty array." },
+      { status: 400 },
+    );
   }
 
   let openai: OpenAI;
   try {
     openai = getOpenAIClient();
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Server configuration error.";
+    const msg =
+      err instanceof Error ? err.message : "Server configuration error.";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 
   // ── Extract tracking IDs from the full conversation ──
-  const allText   = messages.map((m) => m.content).join(" ");
-  const ids       = extractTrackingIds(allText);
-  const shipCtx   = buildShipmentContext(ids);
+  const allText = messages.map((m) => m.content).join(" ");
+  const ids = extractTrackingIds(allText);
+  const shipCtx = buildShipmentContext(ids);
 
   // ── Build system prompt (with shipment context injected if relevant) ──
   const systemContent = BASE_SYSTEM_PROMPT + shipCtx;
@@ -115,7 +131,7 @@ export async function POST(req: NextRequest) {
   const openaiMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemContent },
     ...messages.map((m) => ({
-      role:    m.role === "ai" ? ("assistant" as const) : (m.role as "user" | "assistant"),
+      role: m.role === "ai" ? "assistant" : m.role,
       content: m.content,
     })),
   ];
@@ -130,16 +146,18 @@ export async function POST(req: NextRequest) {
       try {
         const completion = await openai.chat.completions.create({
           model,
-          messages:    openaiMessages,
-          stream:      true,
+          messages: openaiMessages,
+          stream: true,
           temperature: 0.6,
-          max_tokens:  700,
+          max_tokens: 700,
         });
 
         for await (const chunk of completion) {
           const delta = chunk.choices[0]?.delta?.content;
           if (delta) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`));
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`),
+            );
           }
           if (chunk.choices[0]?.finish_reason === "stop") {
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
@@ -150,7 +168,9 @@ export async function POST(req: NextRequest) {
           err instanceof OpenAI.APIError
             ? `OpenAI error ${err.status}: ${err.message}`
             : "Unexpected error while streaming.";
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`),
+        );
       } finally {
         controller.close();
       }
@@ -159,9 +179,9 @@ export async function POST(req: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      "Content-Type":                "text/event-stream",
-      "Cache-Control":               "no-cache, no-transform",
-      "Connection":                  "keep-alive",
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
       "Access-Control-Allow-Origin": "*",
     },
   });
@@ -171,7 +191,7 @@ export async function OPTIONS() {
   return new Response(null, {
     status: 204,
     headers: {
-      "Access-Control-Allow-Origin":  "*",
+      "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
     },
